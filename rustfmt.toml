@@ -1,0 +1,46 @@
+# Use the newest formatting rules
+style_edition = "2024"
+
+# Keep imports readable and minimize merge conflicts
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+
+# Keep code readable when expressions get large
+use_small_heuristics = "Max"
+max_width = 100
+chain_width = 80
+fn_call_width = 80
+struct_lit_width = 40
+struct_variant_width = 40
+
+# Encourage readable formatting
+format_strings = true
+format_macro_matchers = true
+format_macro_bodies = true
+
+# Avoid unnecessary formatting churn
+normalize_comments = false
+wrap_comments = false
+comment_width = 80
+
+# Keep diffs clean
+reorder_modules = true
+remove_nested_parens = true
+
+# Control trailing commas (better git diffs)
+trailing_comma = "Vertical"
+
+# Make match arms readable
+match_block_trailing_comma = true
+
+# Avoid overly compressed code
+use_field_init_shorthand = true
+use_try_shorthand = true
+
+# Improve block readability
+newline_style = "Unix"
+
+# Keep impl blocks readable
+blank_lines_upper_bound = 2
+blank_lines_lower_bound = 0
