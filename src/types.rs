@@ -3,6 +3,7 @@ pub enum CharacterClasses {
     Digits,
     Characters,
     MultiMatch(Vec<char>),
+    NegativeMatch(Vec<char>),
     SingleMatch(String),
 }
 
@@ -12,6 +13,13 @@ impl TryFrom<&String> for CharacterClasses {
         match option.as_str() {
             "\\d" => Ok(CharacterClasses::Digits),
             "\\w" => Ok(CharacterClasses::Characters),
+            val if val.starts_with("[^") && val.ends_with("]") => {
+                let char_vec = val.chars().collect::<Vec<char>>();
+
+                let match_chars = char_vec[2..val.len() - 1].to_vec();
+
+                Ok(CharacterClasses::NegativeMatch(match_chars))
+            },
             val if val.starts_with("[") && val.ends_with("]") => {
                 let char_vec = val.chars().collect::<Vec<char>>();
 
@@ -62,6 +70,22 @@ impl CharacterClasses {
 
         result
     }
+
+    pub fn match_negative_bracket_based_input(input: &str, neg_match_chars: &[char]) -> bool {
+        let mut result = false;
+
+        println!("neg match chars: {neg_match_chars:#?}");
+
+        for char in input.chars() {
+            if !neg_match_chars.contains(&char) {
+                result = true;
+                break;
+            }
+        }
+
+        result
+    }
+
 
     pub fn match_single_pattern(input: &str, pattern: &str) -> bool {
         input.contains(pattern)

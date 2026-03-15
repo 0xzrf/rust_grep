@@ -31,6 +31,9 @@ impl GrepArgs {
                 CharacterClasses::SingleMatch(pattern) => {
                     Ok(CharacterClasses::match_single_pattern(&input_line, &pattern))
                 },
+                CharacterClasses::NegativeMatch(pattern) => {
+                    Ok(CharacterClasses::match_negative_bracket_based_input(&input_line, &pattern))
+                },
             }
         } else {
             Err(GrepError::InvalidOptionProvided)
