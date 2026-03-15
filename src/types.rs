@@ -2,9 +2,33 @@
 pub enum CharacterClasses {
     Digits,
     Characters,
-    MultiMatch(Vec<char>),
+    PositiveMatch(Vec<char>),
     NegativeMatch(Vec<char>),
     SingleMatch(String),
+}
+
+pub struct PatternParser(Vec<CharacterClasses>);
+
+impl From<&String> for PatternParser {
+    fn from(pattern: &String) -> Self {
+        let mut peek_itterator = pattern.chars().peekable();
+
+        let mut patter_vec: Vec<CharacterClasses> = vec![];
+
+        while peek_itterator.peek().is_some() {
+            if peek_itterator.peek() == Some(&'\\') {
+                peek_itterator.next();
+                if peek_itterator.peek() == Some(&'d') {
+                    patter_vec.push(CharacterClasses::Digits)
+                } else if peek_itterator.peek() == Some(&'w') {
+                    patter_vec.push(CharacterClasses::Characters)
+                };
+            }
+            if peek_itterator.peek() == Some(&'[') {}
+        }
+
+        todo!()
+    }
 }
 
 impl TryFrom<&String> for CharacterClasses {
@@ -16,6 +40,7 @@ impl TryFrom<&String> for CharacterClasses {
             val if val.starts_with("[^") && val.ends_with("]") => {
                 let char_vec = val.chars().collect::<Vec<char>>();
 
+                // we exclude the first 2 values, as they contain `[` and `^` characters, which is not the characters of significance for the operation
                 let match_chars = char_vec[2..val.len() - 1].to_vec();
 
                 Ok(CharacterClasses::NegativeMatch(match_chars))
@@ -25,7 +50,7 @@ impl TryFrom<&String> for CharacterClasses {
 
                 let match_chars = char_vec[1..val.len() - 1].to_vec();
 
-                Ok(CharacterClasses::MultiMatch(match_chars))
+                Ok(CharacterClasses::PositiveMatch(match_chars))
             },
             val if val.chars().count() == 1 => Ok(CharacterClasses::SingleMatch(val.to_string())),
             _ => Err(()),

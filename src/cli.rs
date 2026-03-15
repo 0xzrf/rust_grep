@@ -25,7 +25,7 @@ impl GrepArgs {
                 CharacterClasses::Digits => {
                     Ok(CharacterClasses::string_contains_digit_class(&input_line))
                 },
-                CharacterClasses::MultiMatch(pattern) => {
+                CharacterClasses::PositiveMatch(pattern) => {
                     Ok(CharacterClasses::match_bracket_based_input(&input_line, &pattern))
                 },
                 CharacterClasses::SingleMatch(pattern) => {
