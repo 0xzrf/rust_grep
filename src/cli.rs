@@ -2,24 +2,26 @@ use std::io;
 
 use clap::Parser;
 
+use super::{CharacterClasses, GrepError};
+
 #[derive(Parser)]
 #[clap(rename_all = "kebab-case")]
 pub struct GrepArgs {
     #[arg(short = 'E')]
-    target_value: String,
+    option: String,
 }
 
 impl GrepArgs {
-    pub fn match_pattern(&self) -> bool {
-        println!("Write the pattern to match");
+    pub fn match_pattern(&self) -> Result<bool, GrepError> {
         let mut input_line = String::new();
-        let pattern = &self.target_value;
+        let pattern = &self.option;
         io::stdin().read_line(&mut input_line).unwrap();
 
-        if pattern.chars().count() == 1 {
-            input_line.contains(pattern)
-        } else {
-            panic!("Unhandled pattern: {}", pattern)
-        }
+        // if CharacterClasses::try_from(&input_line).is_err() {
+        //     println!("Invalid error");
+        //     return ;
+        // }
+
+        todo!()
     }
 }
