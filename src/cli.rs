@@ -27,11 +27,11 @@ impl GrepArgs {
                 },
             }
         } else {
-            Ok(Self::match_first_char(&input_line, &self.option))
+            Ok(Self::match_input_contains_val(&input_line, &self.option))
         }
     }
 
-    pub fn match_first_char(input: &str, pattern: &str) -> bool {
+    pub fn match_input_contains_val(input: &str, pattern: &str) -> bool {
         if pattern.chars().count() == 1 {
             input.contains(pattern)
         } else {

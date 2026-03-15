@@ -31,7 +31,7 @@ impl CharacterClasses {
     pub fn string_contains_character_class(target_value: &str) -> bool {
         let mut result = false;
         for char in target_value.chars() {
-            if char.is_alphabetic() {
+            if char.is_alphanumeric() || char == '_' {
                 result = true;
                 break;
             }
