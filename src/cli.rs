@@ -14,14 +14,20 @@ pub struct GrepArgs {
 impl GrepArgs {
     pub fn match_pattern(&self) -> Result<bool, GrepError> {
         let mut input_line = String::new();
-        let pattern = &self.option;
+
         io::stdin().read_line(&mut input_line).unwrap();
 
-        // if CharacterClasses::try_from(&input_line).is_err() {
-        //     println!("Invalid error");
-        //     return ;
-        // }
-
-        todo!()
+        if let Ok(option) = CharacterClasses::try_from(&self.option) {
+            match option {
+                CharacterClasses::Characters => {
+                    Ok(CharacterClasses::string_contains_character_class(&input_line))
+                },
+                CharacterClasses::Digits => {
+                    Ok(CharacterClasses::string_contains_digit_class(&input_line))
+                },
+            }
+        } else {
+            Err(GrepError::InvalidOptionProvided)
+        }
     }
 }

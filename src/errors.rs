@@ -4,4 +4,7 @@ use thiserror::Error;
 pub enum GrepError {
     #[error("Invalid option provided")]
     InvalidOptionProvided,
+
+    #[error("Failted to match")]
+    FailedToMatch,
 }

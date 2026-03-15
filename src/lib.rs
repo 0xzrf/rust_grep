@@ -10,7 +10,9 @@ use errors::*;
 pub fn run() -> Result<(), GrepError> {
     let args = GrepArgs::parse();
 
-    args.match_pattern()?;
+    if !args.match_pattern()? {
+        return Err(GrepError::FailedToMatch);
+    }
 
     Ok(())
 }
