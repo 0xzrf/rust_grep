@@ -27,7 +27,15 @@ impl GrepArgs {
                 },
             }
         } else {
-            Err(GrepError::InvalidOptionProvided)
+            Ok(Self::match_first_char(&input_line, &self.option))
+        }
+    }
+
+    pub fn match_first_char(input: &str, pattern: &str) -> bool {
+        if pattern.chars().count() == 1 {
+            input.contains(pattern)
+        } else {
+            panic!("Invalid pattern")
         }
     }
 }
