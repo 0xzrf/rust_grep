@@ -25,17 +25,15 @@ impl GrepArgs {
                 CharacterClasses::Digits => {
                     Ok(CharacterClasses::string_contains_digit_class(&input_line))
                 },
+                CharacterClasses::MultiMatch(pattern) => {
+                    Ok(CharacterClasses::match_bracket_based_input(&input_line, &pattern))
+                },
+                CharacterClasses::SingleMatch(pattern) => {
+                    Ok(CharacterClasses::match_single_pattern(&input_line, &pattern))
+                },
             }
         } else {
-            Ok(Self::match_input_contains_val(&input_line, &self.option))
-        }
-    }
-
-    pub fn match_input_contains_val(input: &str, pattern: &str) -> bool {
-        if pattern.chars().count() == 1 {
-            input.contains(pattern)
-        } else {
-            panic!("Invalid pattern")
+            Err(GrepError::InvalidOptionProvided)
         }
     }
 }

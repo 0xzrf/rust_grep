@@ -2,14 +2,24 @@
 pub enum CharacterClasses {
     Digits,
     Characters,
+    MultiMatch(Vec<char>),
+    SingleMatch(String),
 }
 
 impl TryFrom<&String> for CharacterClasses {
     type Error = ();
-    fn try_from(value: &String) -> Result<Self, Self::Error> {
-        match value.as_str() {
+    fn try_from(option: &String) -> Result<Self, Self::Error> {
+        match option.as_str() {
             "\\d" => Ok(CharacterClasses::Digits),
             "\\w" => Ok(CharacterClasses::Characters),
+            val if val.starts_with("[") && val.ends_with("]") => {
+                let char_vec = val.chars().collect::<Vec<char>>();
+
+                let match_chars = char_vec[1..val.len() - 1].to_vec();
+
+                Ok(CharacterClasses::MultiMatch(match_chars))
+            },
+            val if val.chars().count() == 1 => Ok(CharacterClasses::SingleMatch(val.to_string())),
             _ => Err(()),
         }
     }
@@ -38,5 +48,22 @@ impl CharacterClasses {
         }
 
         result
+    }
+
+    pub fn match_bracket_based_input(input: &str, match_chars: &[char]) -> bool {
+        let mut result = false;
+
+        for char in input.chars() {
+            if match_chars.contains(&char) {
+                result = true;
+                break;
+            }
+        }
+
+        result
+    }
+
+    pub fn match_single_pattern(input: &str, pattern: &str) -> bool {
+        input.contains(pattern)
     }
 }
