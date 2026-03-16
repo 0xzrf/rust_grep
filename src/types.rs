@@ -159,5 +159,22 @@ pub mod pattern_parser_tests {
         let parsed_pattern = PatternParser::from(pattern_str).0;
 
         assert_eq!(expected_vec, parsed_pattern);
+
+        let pattern_str = "\\d \\w\\w\\ws[abc][^abc]";
+
+        let expected_vec = vec![
+            CharacterClasses::Digits,
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Characters,
+            CharacterClasses::Characters,
+            CharacterClasses::Characters,
+            CharacterClasses::Literal("s".to_string()),
+            CharacterClasses::PositiveMatch(vec!['a', 'b', 'c']),
+            CharacterClasses::NegativeMatch(vec!['a', 'b', 'c']),
+        ];
+
+        let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        assert_eq!(expected_vec, parsed_pattern);
     }
 }
