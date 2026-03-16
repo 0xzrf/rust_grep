@@ -30,7 +30,7 @@ impl From<&String> for PatternParser {
                     let mut is_neg = false;
                     if peek_itterator.peek() == Some(&'^') {
                         is_neg = true;
-                        peek_itterator.next(); // jump to the next value, to start putting it in the Vec<char>
+                        peek_itterator.next(); // skip `^` and jump to the next value, to start putting it in the Vec<char>
                     }
                     // this is a bracket iterrator, so get all the unique values that're there till `]` occurs
                     let mut find_chars_vec: Vec<char> = vec![];
@@ -38,6 +38,12 @@ impl From<&String> for PatternParser {
                     // stops when `]` is encountered
                     while let Some(unique_char) = peek_itterator.next_if(|&x| x != ']') {
                         find_chars_vec.push(unique_char);
+                    }
+
+                    if is_neg {
+                        patter_vec.push(CharacterClasses::NegativeMatch(find_chars_vec));
+                    } else {
+                        patter_vec.push(CharacterClasses::PositiveMatch(find_chars_vec));
                     }
 
                     peek_itterator.next(); // `]` still remains, so do a .next() to take care of it
