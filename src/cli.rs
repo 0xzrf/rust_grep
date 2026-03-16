@@ -2,7 +2,7 @@ use std::io;
 
 use clap::Parser;
 
-use super::{CharacterClasses, GrepError};
+use super::{GrepError, PatternParser};
 
 #[derive(Parser)]
 #[clap(rename_all = "kebab-case")]
@@ -17,29 +17,6 @@ impl GrepArgs {
 
         io::stdin().read_line(&mut input_line).unwrap();
 
-        if let Ok(option) = CharacterClasses::try_from(&self.option) {
-            match option {
-                CharacterClasses::Characters => {
-                    Ok(CharacterClasses::string_contains_character_class(&input_line))
-                },
-                CharacterClasses::Digits => {
-                    Ok(CharacterClasses::string_contains_digit_class(&input_line))
-                },
-                CharacterClasses::PositiveMatch(pattern) => {
-                    Ok(CharacterClasses::match_bracket_based_input(&input_line, &pattern))
-                },
-                CharacterClasses::SingleMatch(pattern) => {
-                    Ok(CharacterClasses::match_single_pattern(&input_line, &pattern))
-                },
-                CharacterClasses::NegativeMatch(pattern) => {
-                    Ok(CharacterClasses::match_negative_bracket_based_input(&input_line, &pattern))
-                },
-                _ => {
-                    unreachable!() // TODO: Remove it soon
-                },
-            }
-        } else {
-            Err(GrepError::InvalidOptionProvided)
-        }
+        todo!()
     }
 }
