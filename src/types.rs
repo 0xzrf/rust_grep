@@ -5,6 +5,8 @@ pub enum CharacterClasses {
     PositiveMatch(Vec<char>),
     NegativeMatch(Vec<char>),
     SingleMatch(String),
+    Literal(String),
+    WhiteSpace,
 }
 
 pub struct PatternParser(Vec<CharacterClasses>);
@@ -13,16 +15,16 @@ impl From<&String> for PatternParser {
     fn from(pattern: &String) -> Self {
         let mut peek_itterator = pattern.chars().peekable();
 
-        let mut patter_vec: Vec<CharacterClasses> = vec![];
+        let mut pattern_vec: Vec<CharacterClasses> = vec![];
 
         while peek_itterator.peek().is_some() {
             match peek_itterator.peek() {
                 Some(x) if x == &'\\' => {
                     peek_itterator.next();
                     if peek_itterator.peek() == Some(&'d') {
-                        patter_vec.push(CharacterClasses::Digits)
+                        pattern_vec.push(CharacterClasses::Digits)
                     } else if peek_itterator.peek() == Some(&'w') {
-                        patter_vec.push(CharacterClasses::Characters)
+                        pattern_vec.push(CharacterClasses::Characters)
                     };
                 },
                 Some(y) if y == &'[' => {
@@ -41,14 +43,27 @@ impl From<&String> for PatternParser {
                     }
 
                     if is_neg {
-                        patter_vec.push(CharacterClasses::NegativeMatch(find_chars_vec));
+                        pattern_vec.push(CharacterClasses::NegativeMatch(find_chars_vec));
                     } else {
-                        patter_vec.push(CharacterClasses::PositiveMatch(find_chars_vec));
+                        pattern_vec.push(CharacterClasses::PositiveMatch(find_chars_vec));
+                    }
+                },
+                Some(space) if space == &' ' => {
+                    pattern_vec.push(CharacterClasses::WhiteSpace);
+                },
+                Some(literal) => {
+                    let mut literal_char_vec: Vec<char> = vec![];
+
+                    while let Some(char) = peek_itterator
+                        .next_if(|char| char.ne(&'\\') || char.ne(&'[') || char.ne(&' '))
+                    {
+                        literal_char_vec.push(char);
                     }
 
-                    peek_itterator.next(); // `]` still remains, so do a .next() to take care of it
+                    pattern_vec.push(CharacterClasses::Literal(
+                        literal_char_vec.into_iter().collect::<String>(),
+                    ));
                 },
-                Some(literal) => {},
                 None => {},
             }
             peek_itterator.next();

@@ -34,6 +34,9 @@ impl GrepArgs {
                 CharacterClasses::NegativeMatch(pattern) => {
                     Ok(CharacterClasses::match_negative_bracket_based_input(&input_line, &pattern))
                 },
+                _ => {
+                    unreachable!() // TODO: Remove it soon
+                },
             }
         } else {
             Err(GrepError::InvalidOptionProvided)
