@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum CharacterClasses {
     Digits,
     Characters,
@@ -9,10 +9,11 @@ pub enum CharacterClasses {
     WhiteSpace,
 }
 
+#[derive(Debug)]
 pub struct PatternParser(Vec<CharacterClasses>);
 
-impl From<&String> for PatternParser {
-    fn from(pattern: &String) -> Self {
+impl From<&str> for PatternParser {
+    fn from(pattern: &str) -> Self {
         let mut peek_itterator = pattern.chars().peekable();
 
         let mut pattern_vec: Vec<CharacterClasses> = vec![];
@@ -51,7 +52,7 @@ impl From<&String> for PatternParser {
                 Some(space) if space == &' ' => {
                     pattern_vec.push(CharacterClasses::WhiteSpace);
                 },
-                Some(literal) => {
+                Some(_literal) => {
                     let mut literal_char_vec: Vec<char> = vec![];
 
                     while let Some(char) = peek_itterator
@@ -69,7 +70,7 @@ impl From<&String> for PatternParser {
             peek_itterator.next();
         }
 
-        todo!()
+        PatternParser(pattern_vec)
     }
 }
 
@@ -156,5 +157,55 @@ impl CharacterClasses {
 
     pub fn match_single_pattern(input: &str, pattern: &str) -> bool {
         input.contains(pattern)
+    }
+}
+
+
+#[cfg(test)]
+pub mod pattern_parser_tests {
+
+    use super::*;
+    #[test]
+    pub fn test_convert_string_to_pattern_parser() {
+        let pattern_str = "\\d\\d";
+        let expected_vec = vec![CharacterClasses::Digits, CharacterClasses::Digits];
+
+        let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        assert_eq!(expected_vec, parsed_pattern);
+
+        let pattern_str = "\\d \\d"; // handle whitespace case scenario
+        let expected_vec =
+            vec![CharacterClasses::Digits, CharacterClasses::WhiteSpace, CharacterClasses::Digits];
+        let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        assert_eq!(expected_vec, parsed_pattern);
+
+        let pattern_str = "\\d \\d[abc]";
+
+        let expected_vec = vec![
+            CharacterClasses::Digits,
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Digits,
+            CharacterClasses::PositiveMatch(vec!['a', 'b', 'c']),
+        ];
+
+        let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        assert_eq!(expected_vec, parsed_pattern);
+
+        let pattern_str = "\\d \\d[abc]literal_val";
+
+        let expected_vec = vec![
+            CharacterClasses::Digits,
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Digits,
+            CharacterClasses::PositiveMatch(vec!['a', 'b', 'c']),
+            CharacterClasses::Literal("literal_val".to_string()),
+        ];
+
+        let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        assert_eq!(expected_vec, parsed_pattern);
     }
 }
