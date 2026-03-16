@@ -16,15 +16,36 @@ impl From<&String> for PatternParser {
         let mut patter_vec: Vec<CharacterClasses> = vec![];
 
         while peek_itterator.peek().is_some() {
-            if peek_itterator.peek() == Some(&'\\') {
-                peek_itterator.next();
-                if peek_itterator.peek() == Some(&'d') {
-                    patter_vec.push(CharacterClasses::Digits)
-                } else if peek_itterator.peek() == Some(&'w') {
-                    patter_vec.push(CharacterClasses::Characters)
-                };
+            match peek_itterator.peek() {
+                Some(x) if x == &'\\' => {
+                    peek_itterator.next();
+                    if peek_itterator.peek() == Some(&'d') {
+                        patter_vec.push(CharacterClasses::Digits)
+                    } else if peek_itterator.peek() == Some(&'w') {
+                        patter_vec.push(CharacterClasses::Characters)
+                    };
+                },
+                Some(y) if y == &'[' => {
+                    peek_itterator.next();
+                    let mut is_neg = false;
+                    if peek_itterator.peek() == Some(&'^') {
+                        is_neg = true;
+                        peek_itterator.next(); // jump to the next value, to start putting it in the Vec<char>
+                    }
+                    // this is a bracket iterrator, so get all the unique values that're there till `]` occurs
+                    let mut find_chars_vec: Vec<char> = vec![];
+
+                    // stops when `]` is encountered
+                    while let Some(unique_char) = peek_itterator.next_if(|&x| x != ']') {
+                        find_chars_vec.push(unique_char);
+                    }
+
+                    peek_itterator.next(); // `]` still remains, so do a .next() to take care of it
+                },
+                Some(literal) => {},
+                None => {},
             }
-            if peek_itterator.peek() == Some(&'[') {}
+            peek_itterator.next();
         }
 
         todo!()
