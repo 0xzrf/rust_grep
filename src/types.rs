@@ -81,9 +81,17 @@ impl From<&str> for PatternParser {
 #[cfg(test)]
 pub mod pattern_parser_tests {
     use super::*;
+    use crate::helpers::is_debug_mode;
 
     pub fn assert_equality_test(pattern_str: &str, expected_pattern: Vec<CharacterClasses>) {
         let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        if is_debug_mode() {
+            println!(
+                "Pattern string: {pattern_str}\nParsed: {parsed_pattern:#?}\nExpected: \
+                 {expected_pattern:#?}"
+            );
+        }
 
         assert_eq!(
             expected_pattern, parsed_pattern,
