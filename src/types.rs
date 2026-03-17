@@ -1,10 +1,11 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum CharacterClasses {
     Digits,
     Characters,
     PositiveMatch(Vec<char>),
     NegativeMatch(Vec<char>),
     Literal(String),
+    StartAnchor(Vec<CharacterClasses>),
     WhiteSpace,
 }
 
@@ -51,6 +52,19 @@ impl From<&str> for PatternParser {
                 },
                 Some(space) if space == &' ' => {
                     pattern_vec.push(CharacterClasses::WhiteSpace);
+                },
+                Some(start_anchor) if start_anchor == &'^' => {
+                    peek_itterator.next(); // skip the `^` character
+                    let mut start_anchor_char_vec: Vec<char> = vec![];
+
+                    for char in &mut peek_itterator {
+                        start_anchor_char_vec.push(char);
+                    }
+                    let collected_string = start_anchor_char_vec.into_iter().collect::<String>();
+                    let pattern_parser = PatternParser::from(collected_string.as_str()).0;
+
+                    pattern_vec.push(CharacterClasses::StartAnchor(pattern_parser));
+                    skip_next = false;
                 },
                 Some(_literal) => {
                     let mut literal_char_vec: Vec<char> = vec![];
@@ -109,6 +123,9 @@ impl PatternParser {
 
                         (literal.eq(&input_slice), literal_len)
                     },
+                    MatchResultType::StartAnchorMatch(matching_vec) => {
+                        todo!()
+                    },
                 };
 
                 if match_result_true {
@@ -120,9 +137,9 @@ impl PatternParser {
                     }
                     continue;
                 } else {
+                    // the character didn't match, so we will break the string and continue with the next first match
                     input_peekable.next();
                     position_counter += 1;
-                    // the character didn't match, so we will break the string and continue with the next first match
                     break;
                 }
             }
@@ -137,6 +154,7 @@ impl PatternParser {
 pub enum MatchResultType {
     CharMatch(bool),
     LiteralMatch(String),
+    StartAnchorMatch(Vec<CharacterClasses>),
 }
 
 impl CharacterClasses {
@@ -159,6 +177,9 @@ impl CharacterClasses {
             ),
             CharacterClasses::Literal(literal_match) => {
                 MatchResultType::LiteralMatch(literal_match.to_string())
+            },
+            CharacterClasses::StartAnchor(start_anchor) => {
+                MatchResultType::StartAnchorMatch(start_anchor.clone())
             },
         }
     }
@@ -298,6 +319,20 @@ pub mod pattern_parser_tests {
             CharacterClasses::NegativeMatch(vec!['a', 'b', 'c']),
             CharacterClasses::Literal("abc".to_string()),
         ];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "^str";
+        let expected_pattern =
+            vec![CharacterClasses::StartAnchor(vec![CharacterClasses::Literal("str".to_string())])];
+
+        assert_equality_test(pattern_str, expected_pattern);
+        let pattern_str = "^\\d\\d\\d";
+        let expected_pattern = vec![CharacterClasses::StartAnchor(vec![
+            CharacterClasses::Digits,
+            CharacterClasses::Digits,
+            CharacterClasses::Digits,
+        ])];
 
         assert_equality_test(pattern_str, expected_pattern);
     }

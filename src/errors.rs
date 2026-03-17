@@ -7,4 +7,7 @@ pub enum GrepError {
 
     #[error("Failted to match")]
     FailedToMatch,
+
+    #[error("IO error")]
+    IOError,
 }

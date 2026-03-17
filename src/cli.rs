@@ -15,7 +15,7 @@ impl GrepArgs {
     pub fn match_pattern(&self) -> Result<bool, GrepError> {
         let mut input_line = String::new();
 
-        io::stdin().read_line(&mut input_line).unwrap();
+        io::stdin().read_line(&mut input_line).map_err(|_| GrepError::IOError)?;
 
         let pattern_parser = PatternParser::new(&self.option);
 
