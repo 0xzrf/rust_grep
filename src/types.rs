@@ -93,7 +93,7 @@ impl PatternParser {
             let mut match_pattern_vec = pattern_vec.iter().map(|x| (false, x)).collect::<Vec<_>>();
 
             for (matched, pattern) in match_pattern_vec.iter_mut() {
-                let char = input_peekable.peek().expect("This should work properly");
+                let Some(char) = input_peekable.peek() else { break };
                 let (match_result_true, iter_step) = match pattern.match_char_with_pattern(*char) {
                     MatchResultType::CharMatch(match_result_true) => (match_result_true, 1),
                     MatchResultType::LiteralMatch(literal) => {
@@ -126,8 +126,6 @@ impl PatternParser {
                     break;
                 }
             }
-
-            println!("{match_pattern_vec:#?}");
             if match_pattern_vec.iter().all(|x| x.0) {
                 result = true;
                 break;
@@ -176,7 +174,7 @@ impl CharacterClasses {
 
     #[inline(always)]
     fn is_character(input: char) -> bool {
-        input.is_alphanumeric()
+        input.is_alphanumeric() || input.eq(&'_')
     }
 
     #[inline(always)]
@@ -326,9 +324,12 @@ pub mod pattern_parser_tests {
             "Expected the pattern to match"
         );
 
-        println!("----------------------------------");
         assert!(
             assert_pattern_matches("\\d apple", "sally has 3 apples"),
+            "Expected the pattern to match"
+        );
+        assert!(
+            !assert_pattern_matches("\\d \\w\\w\\ws", "sally has 1 dog"),
             "Expected the pattern to match"
         );
     }
