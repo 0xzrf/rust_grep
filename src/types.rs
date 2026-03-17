@@ -156,7 +156,7 @@ pub mod pattern_parser_tests {
 
         assert_equality_test(pattern_str, expected_pattern);
 
-        let pattern_str = "\\d \\w\\w\\ws[abc][^abc]";
+        let pattern_str = "\\d \\w\\w\\ws[abc][^abc]abc";
 
         let expected_pattern = vec![
             CharacterClasses::Digits,
@@ -167,9 +167,9 @@ pub mod pattern_parser_tests {
             CharacterClasses::Literal("s".to_string()),
             CharacterClasses::PositiveMatch(vec!['a', 'b', 'c']),
             CharacterClasses::NegativeMatch(vec!['a', 'b', 'c']),
+            CharacterClasses::Literal("abc".to_string()),
         ];
 
-        println!("------------------------------------");
         assert_equality_test(pattern_str, expected_pattern);
     }
 }
