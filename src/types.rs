@@ -18,6 +18,7 @@ impl From<&str> for PatternParser {
         let mut pattern_vec: Vec<CharacterClasses> = vec![];
 
         while peek_itterator.peek().is_some() {
+            let mut skip_next = true;
             match peek_itterator.peek() {
                 Some(x) if x == &'\\' => {
                     peek_itterator.next();
@@ -55,7 +56,7 @@ impl From<&str> for PatternParser {
                     let mut literal_char_vec: Vec<char> = vec![];
 
                     while let Some(char) = peek_itterator
-                        .next_if(|char| char.ne(&'\\') || char.ne(&'[') || char.ne(&' '))
+                        .next_if(|char| char.ne(&'\\') && char.ne(&'[') && char.ne(&' '))
                     {
                         literal_char_vec.push(char);
                     }
@@ -63,10 +64,13 @@ impl From<&str> for PatternParser {
                     pattern_vec.push(CharacterClasses::Literal(
                         literal_char_vec.into_iter().collect::<String>(),
                     ));
+                    skip_next = false;
                 },
                 None => {},
             }
-            peek_itterator.next();
+            if skip_next {
+                peek_itterator.next();
+            }
         }
 
         PatternParser(pattern_vec)
@@ -78,38 +82,39 @@ impl From<&str> for PatternParser {
 pub mod pattern_parser_tests {
     use super::*;
 
+    pub fn assert_equality_test(pattern_str: &str, expected_pattern: Vec<CharacterClasses>) {
+        let parsed_pattern = PatternParser::from(pattern_str).0;
+
+        assert_eq!(
+            expected_pattern, parsed_pattern,
+            "The pattern didn't parse into expected pattern: {pattern_str}"
+        );
+    }
+
     #[test]
     pub fn test_convert_string_to_pattern_parser() {
         let pattern_str = "\\d\\d";
-        let expected_vec = vec![CharacterClasses::Digits, CharacterClasses::Digits];
+        let expected_pattern = vec![CharacterClasses::Digits, CharacterClasses::Digits];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
+        assert_equality_test(pattern_str, expected_pattern);
 
         let pattern_str = "\\d \\d"; // handle whitespace case scenario
-        let expected_vec =
+        let expected_pattern =
             vec![CharacterClasses::Digits, CharacterClasses::WhiteSpace, CharacterClasses::Digits];
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
-
+        assert_equality_test(pattern_str, expected_pattern);
         let pattern_str = "\\d \\d[abc]";
 
-        let expected_vec = vec![
+        let expected_pattern = vec![
             CharacterClasses::Digits,
             CharacterClasses::WhiteSpace,
             CharacterClasses::Digits,
             CharacterClasses::PositiveMatch(vec!['a', 'b', 'c']),
         ];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
-
+        assert_equality_test(pattern_str, expected_pattern);
         let pattern_str = "\\d \\d[abc]literal_val";
 
-        let expected_vec = vec![
+        let expected_pattern = vec![
             CharacterClasses::Digits,
             CharacterClasses::WhiteSpace,
             CharacterClasses::Digits,
@@ -117,24 +122,19 @@ pub mod pattern_parser_tests {
             CharacterClasses::Literal("literal_val".to_string()),
         ];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
-
+        assert_equality_test(pattern_str, expected_pattern);
         let pattern_str = "\\d apple";
 
-        let expected_vec = vec![
+        let expected_pattern = vec![
             CharacterClasses::Digits,
             CharacterClasses::WhiteSpace,
             CharacterClasses::Literal("apple".to_string()),
         ];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
+        assert_equality_test(pattern_str, expected_pattern);
         let pattern_str = "\\d\\d\\d apples";
 
-        let expected_vec = vec![
+        let expected_pattern = vec![
             CharacterClasses::Digits,
             CharacterClasses::Digits,
             CharacterClasses::Digits,
@@ -142,12 +142,10 @@ pub mod pattern_parser_tests {
             CharacterClasses::Literal("apples".to_string()),
         ];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
+        assert_equality_test(pattern_str, expected_pattern);
         let pattern_str = "\\d \\w\\w\\ws";
 
-        let expected_vec = vec![
+        let expected_pattern = vec![
             CharacterClasses::Digits,
             CharacterClasses::WhiteSpace,
             CharacterClasses::Characters,
@@ -156,13 +154,11 @@ pub mod pattern_parser_tests {
             CharacterClasses::Literal("s".to_string()),
         ];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
+        assert_equality_test(pattern_str, expected_pattern);
 
         let pattern_str = "\\d \\w\\w\\ws[abc][^abc]";
 
-        let expected_vec = vec![
+        let expected_pattern = vec![
             CharacterClasses::Digits,
             CharacterClasses::WhiteSpace,
             CharacterClasses::Characters,
@@ -173,8 +169,7 @@ pub mod pattern_parser_tests {
             CharacterClasses::NegativeMatch(vec!['a', 'b', 'c']),
         ];
 
-        let parsed_pattern = PatternParser::from(pattern_str).0;
-
-        assert_eq!(expected_vec, parsed_pattern);
+        println!("------------------------------------");
+        assert_equality_test(pattern_str, expected_pattern);
     }
 }
