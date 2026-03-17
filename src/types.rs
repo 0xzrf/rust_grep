@@ -117,6 +117,7 @@ impl PatternParser {
                     }
                     continue;
                 } else {
+                    input_peekable.next();
                     // the character didn't match, so we will break the string and continue with the next first match
                     break;
                 }
@@ -296,5 +297,23 @@ pub mod pattern_parser_tests {
     #[test]
     pub fn test_correct_patter_matching_for_input() {
         assert!(assert_pattern_matches("\\d", "1"), "Expected the pattern to match");
+        assert!(!assert_pattern_matches("\\d", "w"), "Expected the pattern to not match");
+        assert!(assert_pattern_matches("\\d apple", "1 apple"), "Expected the pattern to match");
+        assert!(
+            assert_pattern_matches("\\d\\d\\d apples", "I got 100 apples from the store"),
+            "Expected the pattern to match"
+        );
+        assert!(
+            !assert_pattern_matches("\\d\\d\\d apples", "I got 1 apples from the store"),
+            "Expected the pattern to not match"
+        );
+        assert!(
+            !assert_pattern_matches("\\d apples", "1 oranges"),
+            "Expected the pattern to not match"
+        );
+        assert!(
+            assert_pattern_matches("\\d \\w\\w\\ws", "2 cats"),
+            "Expected the pattern to match"
+        );
     }
 }
