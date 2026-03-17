@@ -88,23 +88,24 @@ impl PatternParser {
         let mut input_peekable = input.chars().peekable();
         let mut result = false;
 
+        let mut position_counter = 0u64;
         while input_peekable.peek().is_some() {
             let mut match_pattern_vec = pattern_vec.iter().map(|x| (false, x)).collect::<Vec<_>>();
 
             for (matched, pattern) in match_pattern_vec.iter_mut() {
                 let char = input_peekable.peek().expect("This should work properly");
-
                 let (match_result_true, iter_step) = match pattern.match_char_with_pattern(*char) {
                     MatchResultType::CharMatch(match_result_true) => (match_result_true, 1),
                     MatchResultType::LiteralMatch(literal) => {
-                        let char_position = input.chars().position(|x| x == *char).unwrap(); // the character is definetely in the input
-
                         let literal_len = literal.len();
 
                         // get input ref from char_position to char_position + literal_len
                         // Get a slice of the input string from char_position to char_position + literal_len
-                        let input_slice: String =
-                            input.chars().skip(char_position).take(literal_len).collect();
+                        let input_slice: String = input
+                            .chars()
+                            .skip(position_counter as usize)
+                            .take(literal_len)
+                            .collect();
 
                         (literal.eq(&input_slice), literal_len)
                     },
@@ -113,18 +114,20 @@ impl PatternParser {
                 if match_result_true {
                     *matched = true;
 
-                    for _ in 0..=iter_step {
-                        println!("counter");
+                    for _ in 0..iter_step {
                         input_peekable.next();
+                        position_counter += 1;
                     }
                     continue;
                 } else {
                     input_peekable.next();
+                    position_counter += 1;
                     // the character didn't match, so we will break the string and continue with the next first match
                     break;
                 }
             }
 
+            println!("{match_pattern_vec:#?}");
             if match_pattern_vec.iter().all(|x| x.0) {
                 result = true;
                 break;
@@ -323,6 +326,7 @@ pub mod pattern_parser_tests {
             "Expected the pattern to match"
         );
 
+        println!("----------------------------------");
         assert!(
             assert_pattern_matches("\\d apple", "sally has 3 apples"),
             "Expected the pattern to match"
