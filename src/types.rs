@@ -94,10 +94,10 @@ impl PatternParser {
             for (matched, pattern) in match_pattern_vec.iter_mut() {
                 let char = input_peekable.peek().expect("This should work properly");
 
-                let match_result_true = match pattern.match_char_with_pattern(*char) {
-                    MatchResultType::CharMatch(match_result_true) => match_result_true,
+                let (match_result_true, iter_step) = match pattern.match_char_with_pattern(*char) {
+                    MatchResultType::CharMatch(match_result_true) => (match_result_true, 1),
                     MatchResultType::LiteralMatch(literal) => {
-                        let char_position = input.chars().position(|x| x == *char).unwrap(); // the character is definetely in the input there
+                        let char_position = input.chars().position(|x| x == *char).unwrap(); // the character is definetely in the input
 
                         let literal_len = literal.len();
 
@@ -106,12 +106,15 @@ impl PatternParser {
                         let input_slice: String =
                             input.chars().skip(char_position).take(literal_len).collect();
 
-                        literal.eq(&input_slice)
+                        (literal.eq(&input_slice), literal_len)
                     },
                 };
 
                 if match_result_true {
                     *matched = true;
+                    for _ in 0..iter_step {
+                        input_peekable.next();
+                    }
                     continue;
                 } else {
                     // the character didn't match, so we will break the string and continue with the next first match
@@ -202,6 +205,12 @@ pub mod pattern_parser_tests {
         );
     }
 
+    pub fn assert_pattern_matches(pattern: &str, input: &str) -> bool {
+        let parsed_pattern = PatternParser::from(pattern);
+
+        parsed_pattern.match_input_with_pattern(input)
+    }
+
     #[test]
     pub fn test_convert_string_to_pattern_parser() {
         let pattern_str = "\\d\\d";
@@ -282,5 +291,10 @@ pub mod pattern_parser_tests {
         ];
 
         assert_equality_test(pattern_str, expected_pattern);
+    }
+
+    #[test]
+    pub fn test_correct_patter_matching_for_input() {
+        assert!(assert_pattern_matches("\\d", "1"), "Expected the pattern to match");
     }
 }
