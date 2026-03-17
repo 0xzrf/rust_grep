@@ -77,6 +77,36 @@ impl From<&str> for PatternParser {
     }
 }
 
+impl PatternParser {
+    pub fn new(pattern: &str) -> Self {
+        PatternParser::from(pattern)
+    }
+
+    /// Takes a input string and matches it with the parsed pattern. Return `true` if pattern matches, `false` otherwise
+    pub fn match_input_with_pattern(&self, input: &str) -> bool {
+        todo!()
+    }
+
+    #[inline(always)]
+    fn is_digit(input: char) -> bool {
+        input.is_ascii_digit()
+    }
+
+    #[inline(always)]
+    fn is_character(input: char) -> bool {
+        input.is_alphanumeric()
+    }
+
+    #[inline(always)]
+    fn is_positive_matched(input: char, pattern: Vec<char>) -> bool {
+        pattern.contains(&input)
+    }
+
+    #[inline(always)]
+    fn is_negative_matched(input: char, pattern: Vec<char>) -> bool {
+        !pattern.contains(&input)
+    }
+}
 
 #[cfg(test)]
 pub mod pattern_parser_tests {
