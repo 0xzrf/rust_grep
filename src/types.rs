@@ -84,7 +84,80 @@ impl PatternParser {
 
     /// Takes a input string and matches it with the parsed pattern. Return `true` if pattern matches, `false` otherwise
     pub fn match_input_with_pattern(&self, input: &str) -> bool {
-        todo!()
+        let pattern_vec = &self.0;
+        let mut input_peekable = input.chars().peekable();
+        let mut result = false;
+
+        while input_peekable.peek().is_some() {
+            let mut match_pattern_vec = pattern_vec.iter().map(|x| (false, x)).collect::<Vec<_>>();
+
+            for (matched, pattern) in match_pattern_vec.iter_mut() {
+                let char = input_peekable.peek().expect("This should work properly");
+
+                let match_result_true = match pattern.match_char_with_pattern(*char) {
+                    MatchResultType::CharMatch(match_result_true) => match_result_true,
+                    MatchResultType::LiteralMatch(literal) => {
+                        let char_position = input.chars().position(|x| x == *char).unwrap(); // the character is definetely in the input there
+
+                        let literal_len = literal.len();
+
+                        // get input ref from char_position to char_position + literal_len
+                        // Get a slice of the input string from char_position to char_position + literal_len
+                        let input_slice: String =
+                            input.chars().skip(char_position).take(literal_len).collect();
+
+                        literal.eq(&input_slice)
+                    },
+                };
+
+                if match_result_true {
+                    *matched = true;
+                    continue;
+                } else {
+                    // the character didn't match, so we will break the string and continue with the next first match
+                    break;
+                }
+            }
+
+            if match_pattern_vec.iter().all(|x| x.0) {
+                result = true;
+                break;
+            }
+        }
+        result
+    }
+}
+pub enum MatchResultType {
+    CharMatch(bool),
+    LiteralMatch(String),
+}
+
+impl CharacterClasses {
+    fn match_char_with_pattern(&self, input: char) -> MatchResultType {
+        match self {
+            CharacterClasses::Digits => {
+                MatchResultType::CharMatch(CharacterClasses::is_digit(input))
+            },
+            CharacterClasses::Characters => {
+                MatchResultType::CharMatch(CharacterClasses::is_character(input))
+            },
+            CharacterClasses::WhiteSpace => {
+                MatchResultType::CharMatch(CharacterClasses::is_whitespace(input))
+            },
+            CharacterClasses::PositiveMatch(positive_match_vec) => MatchResultType::CharMatch(
+                CharacterClasses::is_positive_matched(input, positive_match_vec),
+            ),
+            CharacterClasses::NegativeMatch(negative_match_vec) => MatchResultType::CharMatch(
+                CharacterClasses::is_negative_matched(input, negative_match_vec),
+            ),
+            CharacterClasses::Literal(literal_match) => {
+                MatchResultType::LiteralMatch(literal_match.to_string())
+            },
+        }
+    }
+
+    fn is_whitespace(input: char) -> bool {
+        input.eq(&' ')
     }
 
     #[inline(always)]
@@ -98,12 +171,12 @@ impl PatternParser {
     }
 
     #[inline(always)]
-    fn is_positive_matched(input: char, pattern: Vec<char>) -> bool {
+    fn is_positive_matched(input: char, pattern: &Vec<char>) -> bool {
         pattern.contains(&input)
     }
 
     #[inline(always)]
-    fn is_negative_matched(input: char, pattern: Vec<char>) -> bool {
+    fn is_negative_matched(input: char, pattern: &Vec<char>) -> bool {
         !pattern.contains(&input)
     }
 }
