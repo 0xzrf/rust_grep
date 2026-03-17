@@ -99,15 +99,15 @@ impl PatternParser {
     /// Takes a input string and matches it with the parsed pattern. Return `true` if pattern matches, `false` otherwise
     pub fn match_input_with_pattern(&self, input: &str) -> bool {
         let pattern_vec = &self.0;
-        let mut input_peekable = input.chars().peekable();
+        let mut input_peekable = input.char_indices().peekable();
         let mut result = false;
 
-        let mut position_counter = 0u64;
         while input_peekable.peek().is_some() {
             let mut match_pattern_vec = pattern_vec.iter().map(|x| (false, x)).collect::<Vec<_>>();
 
             for (matched, pattern) in match_pattern_vec.iter_mut() {
-                let Some(char) = input_peekable.peek() else { break };
+                let Some((position_counter, char)) = input_peekable.peek() else { break };
+
                 let (match_result_true, iter_step) = match pattern.match_char_with_pattern(*char) {
                     MatchResultType::CharMatch(match_result_true) => (match_result_true, 1),
                     MatchResultType::LiteralMatch(literal) => {
@@ -115,16 +115,51 @@ impl PatternParser {
 
                         // get input ref from char_position to char_position + literal_len
                         // Get a slice of the input string from char_position to char_position + literal_len
-                        let input_slice: String = input
-                            .chars()
-                            .skip(position_counter as usize)
-                            .take(literal_len)
-                            .collect();
+                        let input_slice: String =
+                            input.chars().skip(*position_counter).take(literal_len).collect();
 
                         (literal.eq(&input_slice), literal_len)
                     },
-                    MatchResultType::StartAnchorMatch(matching_vec) => {
-                        todo!()
+                    MatchResultType::StartAnchorMatch(anchor_match_vec) => {
+                        // we will have to assume that position_counter == 0
+                        assert_eq!(*position_counter, 0, "invalid position for anchor match");
+
+                        for pattern in &anchor_match_vec {
+                            let Some((position_counter, char)) = input_peekable.peek() else {
+                                break;
+                            };
+                            let (matched_result, to_skip) =
+                                match pattern.match_char_with_pattern(*char) {
+                                    MatchResultType::CharMatch(match_result_type) => {
+                                        (match_result_type, 1)
+                                    },
+                                    MatchResultType::LiteralMatch(literal) => {
+                                        let literal_len = literal.len();
+
+                                        // get input ref from char_position to char_position + literal_len
+                                        // Get a slice of the input string from char_position to char_position + literal_len
+                                        let input_slice: String = input
+                                            .chars()
+                                            .skip(*position_counter)
+                                            .take(literal_len)
+                                            .collect();
+
+                                        (literal.eq(&input_slice), literal_len)
+                                    },
+                                    _ => {
+                                        unreachable!()
+                                    },
+                                };
+                            if !matched_result {
+                                return false;
+                            } else {
+                                for _ in 0..to_skip {
+                                    input_peekable.next();
+                                }
+                            }
+                        }
+
+                        return true;
                     },
                 };
 
@@ -133,13 +168,12 @@ impl PatternParser {
 
                     for _ in 0..iter_step {
                         input_peekable.next();
-                        position_counter += 1;
                     }
                     continue;
                 } else {
                     // the character didn't match, so we will break the string and continue with the next first match
                     input_peekable.next();
-                    position_counter += 1;
+
                     break;
                 }
             }
@@ -375,7 +409,16 @@ pub mod pattern_parser_tests {
         );
         assert!(
             !assert_pattern_matches("\\d \\w\\w\\ws", "sally has 1 dog"),
-            "Expected the pattern to match"
+            "Expected the pattern to not match"
         );
+
+        assert!(assert_pattern_matches("^log", "log"), "Expected the pattern to match");
+        assert!(assert_pattern_matches("^\\d", "1"), "Expected the pattern to match");
+        assert!(assert_pattern_matches("^\\d\\d\\d", "100s"), "Expected the pattern to match");
+        assert!(
+            !assert_pattern_matches("^\\d\\d\\d", "wwe"),
+            "Expected the pattern to not match"
+        );
+        assert!(!assert_pattern_matches("^log", "slog"), "Expected the pattern to not match");
     }
 }
