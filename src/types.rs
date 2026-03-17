@@ -335,6 +335,16 @@ pub mod pattern_parser_tests {
         ])];
 
         assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "^\\d\\w \\d";
+        let expected_pattern = vec![CharacterClasses::StartAnchor(vec![
+            CharacterClasses::Digits,
+            CharacterClasses::Characters,
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Digits,
+        ])];
+
+        assert_equality_test(pattern_str, expected_pattern);
     }
 
     #[test]
