@@ -112,7 +112,9 @@ impl PatternParser {
 
                 if match_result_true {
                     *matched = true;
-                    for _ in 0..iter_step {
+
+                    for _ in 0..=iter_step {
+                        println!("counter");
                         input_peekable.next();
                     }
                     continue;
@@ -175,12 +177,12 @@ impl CharacterClasses {
     }
 
     #[inline(always)]
-    fn is_positive_matched(input: char, pattern: &Vec<char>) -> bool {
+    fn is_positive_matched(input: char, pattern: &[char]) -> bool {
         pattern.contains(&input)
     }
 
     #[inline(always)]
-    fn is_negative_matched(input: char, pattern: &Vec<char>) -> bool {
+    fn is_negative_matched(input: char, pattern: &[char]) -> bool {
         !pattern.contains(&input)
     }
 }
@@ -208,6 +210,11 @@ pub mod pattern_parser_tests {
 
     pub fn assert_pattern_matches(pattern: &str, input: &str) -> bool {
         let parsed_pattern = PatternParser::from(pattern);
+
+        if is_debug_mode() {
+            println!("------------------------------------");
+            println!("parsed patter target: {parsed_pattern:#?} for pattern: {pattern}");
+        }
 
         parsed_pattern.match_input_with_pattern(input)
     }
@@ -300,7 +307,7 @@ pub mod pattern_parser_tests {
         assert!(!assert_pattern_matches("\\d", "w"), "Expected the pattern to not match");
         assert!(assert_pattern_matches("\\d apple", "1 apple"), "Expected the pattern to match");
         assert!(
-            assert_pattern_matches("\\d\\d\\d apples", "I got 100 apples from the store"),
+            assert_pattern_matches("apples \\d\\d\\d", "I got apples 100 from the store"),
             "Expected the pattern to match"
         );
         assert!(
@@ -313,6 +320,11 @@ pub mod pattern_parser_tests {
         );
         assert!(
             assert_pattern_matches("\\d \\w\\w\\ws", "2 cats"),
+            "Expected the pattern to match"
+        );
+
+        assert!(
+            assert_pattern_matches("\\d apple", "sally has 3 apples"),
             "Expected the pattern to match"
         );
     }

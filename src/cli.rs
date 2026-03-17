@@ -17,6 +17,8 @@ impl GrepArgs {
 
         io::stdin().read_line(&mut input_line).unwrap();
 
-        todo!()
+        let pattern_parser = PatternParser::new(&self.option);
+
+        Ok(pattern_parser.match_input_with_pattern(&input_line))
     }
 }
