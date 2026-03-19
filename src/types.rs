@@ -1,11 +1,20 @@
 #[derive(Debug, PartialEq, Clone)]
 pub enum CharacterClasses {
+    /// Digit set of `0-9`
     Digits,
+    /// Character set of `a-z`, `A-Z`, `0-9` and `_`
     Characters,
+    /// Positive matches tell what should be there. e.g. `[ab]` would match in the positioni only if it has `a or `b``
     PositiveMatch(Vec<char>),
+    /// Negative matches tell what should't be there in a postion. e.g. `[^abc]` doesn't match the position which has either `a`, `b` or `c`
     NegativeMatch(Vec<char>),
+    /// Matches literal value without change. Note: This is case sensitive
     Literal(String),
-    StartAnchor(Vec<CharacterClasses>),
+    /// Anchor defines the start of a line. e.g., `^log` will match `log`, logs`,`log124`, while not match with `slog`, `blog`.
+    Anchor(Vec<CharacterClasses>),
+    /// Line anchor defines the end of a line. e.g. dog$ will match `I have a dog`.
+    LineAnchor(Vec<CharacterClasses>),
+    /// Whitespecee
     WhiteSpace,
 }
 
@@ -17,6 +26,19 @@ impl From<&str> for PatternParser {
         let mut peek_itterator = pattern.chars().peekable();
 
         let mut pattern_vec: Vec<CharacterClasses> = vec![];
+
+        if pattern.ends_with("$") {
+            let mut line_anchor_char_vec = vec![];
+            while let Some(char) = peek_itterator.next_if(|x| x.ne(&'$')) {
+                line_anchor_char_vec.push(char);
+            }
+            let line_vec_string = line_anchor_char_vec.into_iter().collect::<String>();
+
+            let pattern_parser = PatternParser::from(line_vec_string.as_str()).0;
+
+            pattern_vec.push(CharacterClasses::LineAnchor(pattern_parser));
+            return PatternParser(pattern_vec);
+        }
 
         while peek_itterator.peek().is_some() {
             let mut skip_next = true;
@@ -63,7 +85,7 @@ impl From<&str> for PatternParser {
                     let collected_string = start_anchor_char_vec.into_iter().collect::<String>();
                     let pattern_parser = PatternParser::from(collected_string.as_str()).0;
 
-                    pattern_vec.push(CharacterClasses::StartAnchor(pattern_parser));
+                    pattern_vec.push(CharacterClasses::Anchor(pattern_parser));
                     skip_next = false;
                 },
                 Some(_literal) => {
@@ -75,9 +97,12 @@ impl From<&str> for PatternParser {
                         literal_char_vec.push(char);
                     }
 
-                    pattern_vec.push(CharacterClasses::Literal(
-                        literal_char_vec.into_iter().collect::<String>(),
-                    ));
+                    let literal_string = literal_char_vec.into_iter().collect::<String>();
+
+
+                    pattern_vec.push(CharacterClasses::Literal(literal_string));
+
+
                     skip_next = false;
                 },
                 None => {},
@@ -109,8 +134,8 @@ impl PatternParser {
                 let Some((position_counter, char)) = input_peekable.peek() else { break };
 
                 let (match_result_true, iter_step) = match pattern.match_char_with_pattern(*char) {
-                    MatchResultType::CharMatch(match_result_true) => (match_result_true, 1),
-                    MatchResultType::LiteralMatch(literal) => {
+                    MatchResultType::Char(match_result_true) => (match_result_true, 1),
+                    MatchResultType::Literal(literal) => {
                         let literal_len = literal.len();
 
                         // get input ref from char_position to char_position + literal_len
@@ -120,7 +145,7 @@ impl PatternParser {
 
                         (literal.eq(&input_slice), literal_len)
                     },
-                    MatchResultType::StartAnchorMatch(anchor_match_vec) => {
+                    MatchResultType::Anchor(anchor_match_vec) => {
                         // we will have to assume that position_counter == 0
                         assert_eq!(*position_counter, 0, "invalid position for anchor match");
 
@@ -128,33 +153,80 @@ impl PatternParser {
                             let Some((position_counter, char)) = input_peekable.peek() else {
                                 break;
                             };
-                            let (matched_result, to_skip) =
-                                match pattern.match_char_with_pattern(*char) {
-                                    MatchResultType::CharMatch(match_result_type) => {
-                                        (match_result_type, 1)
-                                    },
-                                    MatchResultType::LiteralMatch(literal) => {
-                                        let literal_len = literal.len();
+                            let (matched_result, to_skip) = match pattern
+                                .match_char_with_pattern(*char)
+                            {
+                                MatchResultType::Char(match_result_type) => (match_result_type, 1),
+                                MatchResultType::Literal(literal) => {
+                                    let literal_len = literal.len();
 
-                                        // get input ref from char_position to char_position + literal_len
-                                        // Get a slice of the input string from char_position to char_position + literal_len
-                                        let input_slice: String = input
-                                            .chars()
-                                            .skip(*position_counter)
-                                            .take(literal_len)
-                                            .collect();
+                                    // get input ref from char_position to char_position + literal_len
+                                    // Get a slice of the input string from char_position to char_position + literal_len
+                                    let input_slice: String = input
+                                        .chars()
+                                        .skip(*position_counter)
+                                        .take(literal_len)
+                                        .collect();
 
-                                        (literal.eq(&input_slice), literal_len)
-                                    },
-                                    _ => {
-                                        unreachable!()
-                                    },
-                                };
+                                    (literal.eq(&input_slice), literal_len)
+                                },
+                                _ => {
+                                    unreachable!()
+                                },
+                            };
                             if !matched_result {
                                 return false;
                             } else {
                                 for _ in 0..to_skip {
                                     input_peekable.next();
+                                }
+                            }
+                        }
+
+                        // if the loop ran without anything being false, then return true
+                        return true;
+                    },
+                    MatchResultType::LineAnchor(mut pattern_match_reverse) => {
+                        pattern_match_reverse.reverse();
+                        let mut input_pattern_reverse = input.char_indices().rev().peekable();
+
+                        for pattern in &pattern_match_reverse {
+                            let Some((position_counter, char)) = input_pattern_reverse.peek()
+                            else {
+                                break;
+                            };
+
+                            let (matched_result, to_skip): (bool, usize) =
+                                match pattern.match_char_with_pattern(*char) {
+                                    MatchResultType::Char(match_result) => (match_result, 1),
+                                    MatchResultType::Literal(literal) => {
+                                        // since we're looking in the reverse order, the position_counter we have is at `input.len() - poisition_counter`
+                                        // relative to `input's` initial position
+                                        // so we will need to the input string from `input.len() - literal.len() - position_counter` -> `input.len() - position_counter`
+                                        // and then assert that the literal and the string slice are the same
+                                        let end_ix = (input.len() - 1) - position_counter;
+                                        let start_ix =
+                                            (input.len() - 1) - literal.len() - position_counter;
+
+                                        let input_slice = input
+                                            .chars()
+                                            .skip(start_ix)
+                                            .take(end_ix)
+                                            .collect::<String>();
+
+                                        (literal.eq(&input_slice), literal.len())
+                                    },
+                                    _ => {
+                                        // there won't be an internal anchor or line anchor inside a line anchor
+                                        unreachable!()
+                                    },
+                                };
+
+                            if !matched_result {
+                                return false; // do an early return if it fails to match by any chance
+                            } else {
+                                for _ in 0..to_skip {
+                                    input_pattern_reverse.next();
                                 }
                             }
                         }
@@ -186,34 +258,34 @@ impl PatternParser {
     }
 }
 pub enum MatchResultType {
-    CharMatch(bool),
-    LiteralMatch(String),
-    StartAnchorMatch(Vec<CharacterClasses>),
+    Char(bool),
+    Literal(String),
+    Anchor(Vec<CharacterClasses>),
+    LineAnchor(Vec<CharacterClasses>),
 }
 
 impl CharacterClasses {
     fn match_char_with_pattern(&self, input: char) -> MatchResultType {
         match self {
-            CharacterClasses::Digits => {
-                MatchResultType::CharMatch(CharacterClasses::is_digit(input))
-            },
+            CharacterClasses::Digits => MatchResultType::Char(CharacterClasses::is_digit(input)),
             CharacterClasses::Characters => {
-                MatchResultType::CharMatch(CharacterClasses::is_character(input))
+                MatchResultType::Char(CharacterClasses::is_character(input))
             },
             CharacterClasses::WhiteSpace => {
-                MatchResultType::CharMatch(CharacterClasses::is_whitespace(input))
+                MatchResultType::Char(CharacterClasses::is_whitespace(input))
             },
-            CharacterClasses::PositiveMatch(positive_match_vec) => MatchResultType::CharMatch(
+            CharacterClasses::PositiveMatch(positive_match_vec) => MatchResultType::Char(
                 CharacterClasses::is_positive_matched(input, positive_match_vec),
             ),
-            CharacterClasses::NegativeMatch(negative_match_vec) => MatchResultType::CharMatch(
+            CharacterClasses::NegativeMatch(negative_match_vec) => MatchResultType::Char(
                 CharacterClasses::is_negative_matched(input, negative_match_vec),
             ),
             CharacterClasses::Literal(literal_match) => {
-                MatchResultType::LiteralMatch(literal_match.to_string())
+                MatchResultType::Literal(literal_match.to_string())
             },
-            CharacterClasses::StartAnchor(start_anchor) => {
-                MatchResultType::StartAnchorMatch(start_anchor.clone())
+            CharacterClasses::Anchor(start_anchor) => MatchResultType::Anchor(start_anchor.clone()),
+            CharacterClasses::LineAnchor(line_anchor) => {
+                MatchResultType::LineAnchor(line_anchor.clone())
             },
         }
     }
@@ -358,11 +430,11 @@ pub mod pattern_parser_tests {
 
         let pattern_str = "^str";
         let expected_pattern =
-            vec![CharacterClasses::StartAnchor(vec![CharacterClasses::Literal("str".to_string())])];
+            vec![CharacterClasses::Anchor(vec![CharacterClasses::Literal("str".to_string())])];
 
         assert_equality_test(pattern_str, expected_pattern);
         let pattern_str = "^\\d\\d\\d";
-        let expected_pattern = vec![CharacterClasses::StartAnchor(vec![
+        let expected_pattern = vec![CharacterClasses::Anchor(vec![
             CharacterClasses::Digits,
             CharacterClasses::Digits,
             CharacterClasses::Digits,
@@ -371,11 +443,26 @@ pub mod pattern_parser_tests {
         assert_equality_test(pattern_str, expected_pattern);
 
         let pattern_str = "^\\d\\w \\d";
-        let expected_pattern = vec![CharacterClasses::StartAnchor(vec![
+        let expected_pattern = vec![CharacterClasses::Anchor(vec![
             CharacterClasses::Digits,
             CharacterClasses::Characters,
             CharacterClasses::WhiteSpace,
             CharacterClasses::Digits,
+        ])];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "end$";
+        let expected_pattern =
+            vec![CharacterClasses::LineAnchor(vec![CharacterClasses::Literal("end".to_string())])];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "\\d\\d\\w$";
+        let expected_pattern = vec![CharacterClasses::LineAnchor(vec![
+            CharacterClasses::Digits,
+            CharacterClasses::Digits,
+            CharacterClasses::Characters,
         ])];
 
         assert_equality_test(pattern_str, expected_pattern);
