@@ -157,8 +157,9 @@ impl From<&str> for PatternParser {
                 Some(_literal) => {
                     let mut literal_char_vec: Vec<char> = vec![];
 
-                    while let Some((_, char)) = pattern_peek_iterator
+                    while let Some((ix, char)) = pattern_peek_iterator
                         .next_if(|(_, char)| char.ne(&'\\') && char.ne(&'[') && char.ne(&' '))
+                        && pattern_peek_iterator.peek() != Some(&(ix + 1, '+'))
                     {
                         literal_char_vec.push(char);
                     }
@@ -365,7 +366,12 @@ impl PatternParser {
                         return true;
                     },
                     MatchResultType::Qualifier(QualifierType::Positive(char)) => {
-                        todo!()
+                        let mut char_count = 0u64;
+                        while let Some((_ix, char)) = input_peekable.next_if(|(_, x)| x.eq(&char)) {
+                            char_count += 1;
+                        }
+
+                        (char_count >= 1, char_count as usize)
                     },
                     MatchResultType::Qualifier(QualifierType::Lazy(char)) => {
                         todo!()
@@ -439,7 +445,7 @@ impl CharacterClasses {
                 MatchResultType::ImmAnchor(imm_anchor.clone())
             },
             CharacterClasses::PositiveQuantifier(c) => {
-                MatchResultType::Qualifier(QualifierType::Positive(c.clone()))
+                MatchResultType::Qualifier(QualifierType::Positive(*c))
             },
         }
     }
@@ -630,6 +636,14 @@ pub mod pattern_parser_tests {
         let expected_pattern = vec![CharacterClasses::ImmAnchor(vec![CharacterClasses::Literal(
             "orange".to_string(),
         )])];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "orange+";
+        let expected_pattern = vec![
+            CharacterClasses::Literal("orang".to_string()),
+            CharacterClasses::PositiveQuantifier('e'),
+        ];
 
         assert_equality_test(pattern_str, expected_pattern);
     }
