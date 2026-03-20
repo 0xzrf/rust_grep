@@ -15,7 +15,7 @@ pub enum CharacterClasses {
     /// Line anchor defines the end of a line. e.g. dog$ will match `I have a dog`.
     LineAnchor(Vec<CharacterClasses>),
     ImmAnchor(Vec<CharacterClasses>),
-    PositiveQuantifier(char),
+    PositiveQuantifier(Box<CharacterClasses>),
     /// Whitespecee
     WhiteSpace,
 }
@@ -110,8 +110,24 @@ impl From<&str> for PatternParser {
                     };
                 },
                 Some((ix, char)) if char == &'+' => {
-                    let char = pattern.chars().collect::<Vec<char>>()[ix - 1];
-                    pattern_vec.push(CharacterClasses::PositiveQuantifier(char));
+                    let last_pattern = pattern_vec.pop().unwrap();
+                    println!("last_pattern: {last_pattern:#?}");
+
+                    if let CharacterClasses::Literal(literal) = &last_pattern
+                        && literal.len() > 1
+                    {
+                        let literal_vec = literal.chars().collect::<Vec<char>>();
+                        let (remaining, rep_char) = literal_vec.split_at(literal.len() - 1);
+
+                        pattern_vec
+                            .push(CharacterClasses::Literal(remaining.iter().collect::<String>()));
+                        pattern_vec.push(CharacterClasses::PositiveQuantifier(Box::new(
+                            CharacterClasses::Literal(rep_char.iter().collect::<String>()),
+                        )));
+                    } else {
+                        pattern_vec
+                            .push(CharacterClasses::PositiveQuantifier(Box::new(last_pattern)));
+                    }
                 },
                 Some((_, y)) if y == &'[' => {
                     pattern_peek_iterator.next();
@@ -157,10 +173,9 @@ impl From<&str> for PatternParser {
                 Some(_literal) => {
                     let mut literal_char_vec: Vec<char> = vec![];
 
-                    while let Some((ix, char)) = pattern_peek_iterator
-                        .next_if(|(_, char)| char.ne(&'\\') && char.ne(&'[') && char.ne(&' '))
-                        && pattern_peek_iterator.peek() != Some(&(ix + 1, '+'))
-                    {
+                    while let Some((ix, char)) = pattern_peek_iterator.next_if(|(_, char)| {
+                        char.ne(&'\\') && char.ne(&'[') && char.ne(&' ') && char.ne(&'+')
+                    }) {
                         literal_char_vec.push(char);
                     }
 
@@ -365,13 +380,36 @@ impl PatternParser {
                         // if the loop ran without anything being false, then return true
                         return true;
                     },
-                    MatchResultType::Qualifier(QualifierType::Positive(char)) => {
-                        let mut char_count = 0u64;
-                        while let Some((_ix, char)) = input_peekable.next_if(|(_, x)| x.eq(&char)) {
-                            char_count += 1;
-                        }
+                    MatchResultType::Qualifier(QualifierType::Positive(target_pattern)) => {
+                        let mut pattern_count = 0u64;
+                        while input_peekable
+                            .next_if(|(_ix, char)| {
+                                match target_pattern.as_ref().match_char_with_pattern(*char) {
+                                    MatchResultType::Char(match_result) => {
+                                        if match_result {
+                                            pattern_count += 1;
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    },
+                                    MatchResultType::Literal(target_char) => {
+                                        if target_char.eq(&char.to_string()) {
+                                            pattern_count += 1;
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    },
+                                    _ => {
+                                        unreachable!() // positive qualifier won't have a anchors
+                                    },
+                                }
+                            })
+                            .is_some()
+                        {}
 
-                        (char_count >= 1, char_count as usize)
+                        (pattern_count >= 1, 0)
                     },
                     MatchResultType::Qualifier(QualifierType::Lazy(char)) => {
                         todo!()
@@ -409,11 +447,11 @@ pub enum MatchResultType {
     Anchor(Vec<CharacterClasses>),
     LineAnchor(Vec<CharacterClasses>),
     ImmAnchor(Vec<CharacterClasses>),
-    Qualifier(QualifierType<char>),
+    Qualifier(QualifierType<CharacterClasses>),
 }
 
 pub enum QualifierType<T> {
-    Positive(T),
+    Positive(Box<T>),
     Lazy(T),
     Greedy(T),
 }
@@ -445,7 +483,7 @@ impl CharacterClasses {
                 MatchResultType::ImmAnchor(imm_anchor.clone())
             },
             CharacterClasses::PositiveQuantifier(c) => {
-                MatchResultType::Qualifier(QualifierType::Positive(*c))
+                MatchResultType::Qualifier(QualifierType::Positive(c.clone()))
             },
         }
     }
@@ -498,6 +536,8 @@ pub mod pattern_parser_tests {
 
     pub fn assert_pattern_matches(pattern: &str, input: &str) -> bool {
         let parsed_pattern = PatternParser::from(pattern);
+
+        println!("parsed_pattern: {parsed_pattern:#?}");
 
         parsed_pattern.match_input_with_pattern(input)
     }
@@ -642,7 +682,30 @@ pub mod pattern_parser_tests {
         let pattern_str = "orange+";
         let expected_pattern = vec![
             CharacterClasses::Literal("orang".to_string()),
-            CharacterClasses::PositiveQuantifier('e'),
+            CharacterClasses::PositiveQuantifier(Box::new(CharacterClasses::Literal(
+                "e".to_string(),
+            ))),
+        ];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+
+        let pattern_str = "or+ange";
+        let expected_pattern = vec![
+            CharacterClasses::Literal("o".to_string()),
+            CharacterClasses::PositiveQuantifier(Box::new(CharacterClasses::Literal(
+                "r".to_string(),
+            ))),
+            CharacterClasses::Literal("ange".to_string()),
+        ];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "\\d+ days";
+        let expected_pattern = vec![
+            CharacterClasses::PositiveQuantifier(Box::new(CharacterClasses::Digits)),
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Literal("days".to_string()),
         ];
 
         assert_equality_test(pattern_str, expected_pattern);
@@ -697,5 +760,8 @@ pub mod pattern_parser_tests {
         assert!(!assert_pattern_matches("\\w\\w\\w\\w is a joke", "he is a joke"));
         assert!(assert_pattern_matches("^orange$", "orange"));
         assert!(!assert_pattern_matches("^respberry$", "respberry_respberry"));
+        assert!(assert_pattern_matches("orange+", "orange"));
+        assert!(assert_pattern_matches("orange+", "orangeeeeee"));
+        assert!(assert_pattern_matches("or+ange", "orrrrrrrange"));
     }
 }
