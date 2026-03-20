@@ -15,6 +15,7 @@ pub enum CharacterClasses {
     /// Line anchor defines the end of a line. e.g. dog$ will match `I have a dog`.
     LineAnchor(Vec<CharacterClasses>),
     ImmAnchor(Vec<CharacterClasses>),
+    PositiveQuantifier(char),
     /// Whitespecee
     WhiteSpace,
 }
@@ -24,7 +25,7 @@ pub struct PatternParser(Vec<CharacterClasses>);
 
 impl From<&str> for PatternParser {
     fn from(pattern: &str) -> Self {
-        let mut pattern_peek_iterator = pattern.chars().peekable();
+        let mut pattern_peek_iterator = pattern.char_indices().peekable();
         let mut is_anchor = false;
         let mut is_line_anchor = false;
         let mut pattern_vec: Vec<CharacterClasses> = vec![];
@@ -34,7 +35,8 @@ impl From<&str> for PatternParser {
             let mut peek_anchor_iter = pattern_peek_iterator.clone();
             let mut anchor_char_vec = vec![];
             peek_anchor_iter.next(); // skip `^`
-            while let Some(char) = peek_anchor_iter.next_if(|x| x.ne(&'$')) {
+
+            while let Some((_, char)) = peek_anchor_iter.next_if(|(_, x)| x.ne(&'$')) {
                 anchor_char_vec.push(char);
             }
 
@@ -51,11 +53,13 @@ impl From<&str> for PatternParser {
             let mut line_anchor_char_vec = vec![];
 
             // skip the first value if it is also an anchor
-            if peek_line_anchor_iter.peek() == Some(&'^') {
+            if let Some((_, y)) = peek_line_anchor_iter.peek()
+                && y == &'^'
+            {
                 peek_line_anchor_iter.next();
             }
 
-            while let Some(char) = peek_line_anchor_iter.next_if(|x| x.ne(&'$')) {
+            while let Some((_, char)) = peek_line_anchor_iter.next_if(|(_, x)| x.ne(&'$')) {
                 line_anchor_char_vec.push(char);
             }
             let line_vec_string = line_anchor_char_vec.into_iter().collect::<String>();
@@ -71,7 +75,7 @@ impl From<&str> for PatternParser {
             let pattern_immutable_anchor_peek_iter = pattern_peek_iterator.clone();
             let mut immutable_anchor_char_vec = vec![];
 
-            for char in pattern_immutable_anchor_peek_iter {
+            for (_, char) in pattern_immutable_anchor_peek_iter {
                 if char.eq(&'^') || char.eq(&'$') {
                     continue;
                 }
@@ -92,18 +96,29 @@ impl From<&str> for PatternParser {
         while pattern_peek_iterator.peek().is_some() {
             let mut skip_next = true;
             match pattern_peek_iterator.peek() {
-                Some(x) if x == &'\\' => {
+                Some((_, x)) if x == &'\\' => {
                     pattern_peek_iterator.next();
-                    if pattern_peek_iterator.peek() == Some(&'d') {
+                    if let Some((_, char)) = pattern_peek_iterator.peek()
+                        && char == &'d'
+                    {
                         pattern_vec.push(CharacterClasses::Digits)
-                    } else if pattern_peek_iterator.peek() == Some(&'w') {
+                    }
+                    if let Some((_, char)) = pattern_peek_iterator.peek()
+                        && char == &'w'
+                    {
                         pattern_vec.push(CharacterClasses::Characters)
                     };
                 },
-                Some(y) if y == &'[' => {
+                Some((ix, char)) if char == &'+' => {
+                    let char = pattern.chars().collect::<Vec<char>>()[ix - 1];
+                    pattern_vec.push(CharacterClasses::PositiveQuantifier(char));
+                },
+                Some((_, y)) if y == &'[' => {
                     pattern_peek_iterator.next();
                     let mut is_neg = false;
-                    if pattern_peek_iterator.peek() == Some(&'^') {
+                    if let Some((_, char)) = pattern_peek_iterator.peek()
+                        && char == &'^'
+                    {
                         is_neg = true;
                         pattern_peek_iterator.next(); // skip `^` and jump to the next value, to start putting it in the Vec<char>
                     }
@@ -111,7 +126,9 @@ impl From<&str> for PatternParser {
                     let mut find_chars_vec: Vec<char> = vec![];
 
                     // stops when `]` is encountered
-                    while let Some(unique_char) = pattern_peek_iterator.next_if(|&x| x != ']') {
+                    while let Some((_, unique_char)) =
+                        pattern_peek_iterator.next_if(|&(_, x)| x != ']')
+                    {
                         find_chars_vec.push(unique_char);
                     }
 
@@ -121,14 +138,14 @@ impl From<&str> for PatternParser {
                         pattern_vec.push(CharacterClasses::PositiveMatch(find_chars_vec));
                     }
                 },
-                Some(space) if space == &' ' => {
+                Some((_, space)) if space == &' ' => {
                     pattern_vec.push(CharacterClasses::WhiteSpace);
                 },
-                Some(start_anchor) if start_anchor == &'^' => {
+                Some((_, start_anchor)) if start_anchor == &'^' => {
                     pattern_peek_iterator.next(); // skip the `^` character
                     let mut start_anchor_char_vec: Vec<char> = vec![];
 
-                    for char in &mut pattern_peek_iterator {
+                    for (_, char) in &mut pattern_peek_iterator {
                         start_anchor_char_vec.push(char);
                     }
                     let collected_string = start_anchor_char_vec.into_iter().collect::<String>();
@@ -140,8 +157,8 @@ impl From<&str> for PatternParser {
                 Some(_literal) => {
                     let mut literal_char_vec: Vec<char> = vec![];
 
-                    while let Some(char) = pattern_peek_iterator
-                        .next_if(|char| char.ne(&'\\') && char.ne(&'[') && char.ne(&' '))
+                    while let Some((_, char)) = pattern_peek_iterator
+                        .next_if(|(_, char)| char.ne(&'\\') && char.ne(&'[') && char.ne(&' '))
                     {
                         literal_char_vec.push(char);
                     }
@@ -347,6 +364,15 @@ impl PatternParser {
                         // if the loop ran without anything being false, then return true
                         return true;
                     },
+                    MatchResultType::Qualifier(QualifierType::Positive(char)) => {
+                        todo!()
+                    },
+                    MatchResultType::Qualifier(QualifierType::Lazy(char)) => {
+                        todo!()
+                    },
+                    MatchResultType::Qualifier(QualifierType::Greedy(char)) => {
+                        todo!()
+                    },
                 };
 
                 if match_result_true {
@@ -377,6 +403,13 @@ pub enum MatchResultType {
     Anchor(Vec<CharacterClasses>),
     LineAnchor(Vec<CharacterClasses>),
     ImmAnchor(Vec<CharacterClasses>),
+    Qualifier(QualifierType<char>),
+}
+
+pub enum QualifierType<T> {
+    Positive(T),
+    Lazy(T),
+    Greedy(T),
 }
 
 impl CharacterClasses {
@@ -404,6 +437,9 @@ impl CharacterClasses {
             },
             CharacterClasses::ImmAnchor(imm_anchor) => {
                 MatchResultType::ImmAnchor(imm_anchor.clone())
+            },
+            CharacterClasses::PositiveQuantifier(c) => {
+                MatchResultType::Qualifier(QualifierType::Positive(c.clone()))
             },
         }
     }
