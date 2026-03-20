@@ -315,32 +315,10 @@ impl PatternParser {
                         return true;
                     },
                     MatchResultType::ImmAnchor(imm_anchor) => {
-                        // early return if the length of the value isn't == expected
-                        let mut expected_len = 0u64;
-                        for pattern in &imm_anchor {
-                            match pattern {
-                                CharacterClasses::Digits
-                                | CharacterClasses::WhiteSpace
-                                | CharacterClasses::Characters
-                                | CharacterClasses::NegativeMatch(_)
-                                | CharacterClasses::PositiveMatch(_) => expected_len += 1,
-                                CharacterClasses::Literal(literal) => {
-                                    expected_len += literal.len() as u64
-                                },
-                                _ => {
-                                    unreachable!()
-                                },
-                            }
-                        }
-
-                        if input.len() != expected_len as usize {
-                            return false; // an early return is completely valid if the input isn't exactly the size of the expected pattern
-                        }
-
                         // we will have to assume that position_counter == 0
                         let mut imm_anchor_input_peekable_iter = input.char_indices().peekable();
-
-                        for pattern in &imm_anchor {
+                        let mut match_len = 0u64;
+                        for (imm_anchor_pattern_counter, pattern) in imm_anchor.iter().enumerate() {
                             let Some((position_counter, char)) =
                                 imm_anchor_input_peekable_iter.peek()
                             else {
@@ -363,10 +341,86 @@ impl PatternParser {
 
                                     (literal.eq(&input_slice), literal_len)
                                 },
+                                MatchResultType::Qualifier(QualifierType::Positive(
+                                    target_pattern,
+                                )) => {
+                                    let mut pattern_count = 0u64;
+                                    let mut match_pos_vec = vec![];
+                                    while input_peekable
+                                        .next_if(|(ix, char)| {
+                                            match target_pattern
+                                                .as_ref()
+                                                .match_char_with_pattern(*char)
+                                            {
+                                                MatchResultType::Char(match_result) => {
+                                                    if match_result {
+                                                        pattern_count += 1;
+                                                        match_pos_vec.push(*ix);
+                                                        true
+                                                    } else {
+                                                        false
+                                                    }
+                                                },
+                                                MatchResultType::Literal(target_char) => {
+                                                    if target_char.eq(&char.to_string()) {
+                                                        pattern_count += 1;
+                                                        match_pos_vec.push(*ix);
+                                                        true
+                                                    } else {
+                                                        false
+                                                    }
+                                                },
+                                                _ => {
+                                                    unreachable!() // positive qualifier won't have a anchors
+                                                },
+                                            }
+                                        })
+                                        .is_some()
+                                    {}
+
+
+                                    let remaining_matches = imm_anchor
+                                        .iter()
+                                        .skip(imm_anchor_pattern_counter + 1)
+                                        .cloned()
+                                        .collect::<Vec<_>>();
+
+                                    match_pos_vec.reverse(); // so that the biggest index of match is the first val
+                                    let mut try_result = false;
+                                    let pattern_parser = PatternParser(remaining_matches);
+                                    for match_ix in match_pos_vec {
+                                        let try_input =
+                                            input.chars().skip(match_ix).collect::<String>();
+                                        if pattern_parser.match_input_with_pattern(&try_input) {
+                                            try_result = true;
+                                        }
+                                    }
+
+                                    for pattern in &pattern_parser.0 {
+                                        match pattern {
+                                            CharacterClasses::Characters
+                                            | CharacterClasses::Digits
+                                            | CharacterClasses::WhiteSpace
+                                            | CharacterClasses::PositiveMatch(_)
+                                            | CharacterClasses::NegativeMatch(_) => match_len += 1,
+                                            CharacterClasses::Literal(literal) => {
+                                                match_len += literal.len() as u64
+                                            },
+                                            _ => unreachable!(),
+                                        }
+                                    }
+
+                                    if input.len() != match_len as usize {
+                                        return false;
+                                    }
+
+                                    return try_result;
+                                },
                                 _ => {
                                     unreachable!()
                                 },
                             };
+                            match_len += to_skip as u64;
                             if !matched_result {
                                 return false;
                             } else {
@@ -790,5 +844,6 @@ pub mod pattern_parser_tests {
         assert!(assert_pattern_matches("\\d+ days", "1000000 days"));
         assert!(assert_pattern_matches("\\w+ genius", "freakin genius"));
         assert!(assert_pattern_matches("ca+at", "caaaaats"));
+        assert!(assert_pattern_matches("^abc_\\d+_xyz$", "abc_123_xyz"));
     }
 }
