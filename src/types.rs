@@ -111,7 +111,6 @@ impl From<&str> for PatternParser {
                 },
                 Some((ix, char)) if char == &'+' => {
                     let last_pattern = pattern_vec.pop().unwrap();
-                    println!("last_pattern: {last_pattern:#?}");
 
                     if let CharacterClasses::Literal(literal) = &last_pattern
                         && literal.len() > 1
@@ -211,7 +210,7 @@ impl PatternParser {
 
         while input_peekable.peek().is_some() {
             let mut match_pattern_vec = pattern_vec.iter().map(|x| (false, x)).collect::<Vec<_>>();
-
+            let mut pattern_ix_counter = 0u64;
             for (matched, pattern) in match_pattern_vec.iter_mut() {
                 let Some((position_counter, char)) = input_peekable.peek() else { break };
 
@@ -382,12 +381,14 @@ impl PatternParser {
                     },
                     MatchResultType::Qualifier(QualifierType::Positive(target_pattern)) => {
                         let mut pattern_count = 0u64;
+                        let mut match_pos_vec = vec![];
                         while input_peekable
-                            .next_if(|(_ix, char)| {
+                            .next_if(|(ix, char)| {
                                 match target_pattern.as_ref().match_char_with_pattern(*char) {
                                     MatchResultType::Char(match_result) => {
                                         if match_result {
                                             pattern_count += 1;
+                                            match_pos_vec.push(*ix);
                                             true
                                         } else {
                                             false
@@ -396,6 +397,7 @@ impl PatternParser {
                                     MatchResultType::Literal(target_char) => {
                                         if target_char.eq(&char.to_string()) {
                                             pattern_count += 1;
+                                            match_pos_vec.push(*ix);
                                             true
                                         } else {
                                             false
@@ -409,7 +411,25 @@ impl PatternParser {
                             .is_some()
                         {}
 
-                        (pattern_count >= 1, 0)
+
+                        let remaining_matches = self
+                            .0
+                            .iter()
+                            .skip((pattern_ix_counter + 1) as usize)
+                            .cloned()
+                            .collect::<Vec<_>>();
+
+                        match_pos_vec.reverse(); // so that the biggest index of match is the first val
+                        let mut try_result = false;
+                        let pattern_parser = PatternParser(remaining_matches);
+                        for match_ix in match_pos_vec {
+                            let try_input = input.chars().skip(match_ix).collect::<String>();
+                            if pattern_parser.match_input_with_pattern(&try_input) {
+                                try_result = true;
+                            }
+                        }
+
+                        return try_result;
                     },
                     MatchResultType::Qualifier(QualifierType::Lazy(char)) => {
                         todo!()
@@ -432,7 +452,9 @@ impl PatternParser {
 
                     break;
                 }
+                pattern_ix_counter += 1;
             }
+            // println!("match pattern vec: {match_pattern_vec:#?}");
             if match_pattern_vec.iter().all(|x| x.0) {
                 result = true;
                 break;
@@ -762,6 +784,11 @@ pub mod pattern_parser_tests {
         assert!(!assert_pattern_matches("^respberry$", "respberry_respberry"));
         assert!(assert_pattern_matches("orange+", "orange"));
         assert!(assert_pattern_matches("orange+", "orangeeeeee"));
-        assert!(assert_pattern_matches("or+ange", "orrrrrrrange"));
+        assert!(assert_pattern_matches("or+ange", "orange"));
+        assert!(assert_pattern_matches("or+ange", "orrrrrrrrrange"));
+
+        assert!(assert_pattern_matches("\\d+ days", "1000000 days"));
+        assert!(assert_pattern_matches("\\w+ genius", "freakin genius"));
+        assert!(assert_pattern_matches("ca+at", "caaaaats"));
     }
 }
