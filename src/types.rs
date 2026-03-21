@@ -17,6 +17,7 @@ pub enum CharacterClasses {
     ImmAnchor(Vec<CharacterClasses>),
     PositiveQuantifier(Box<CharacterClasses>),
     LazyQuantifier(Box<CharacterClasses>),
+    WildcardQualifier,
     /// Whitespecee
     WhiteSpace,
 }
@@ -147,6 +148,9 @@ impl From<&str> for PatternParser {
                         pattern_vec.push(CharacterClasses::LazyQuantifier(Box::new(last_pattern)));
                     }
                 },
+                Some((ix, char)) if char == &'.' => {
+                    pattern_vec.push(CharacterClasses::WildcardQualifier)
+                },
                 Some((_, y)) if y == &'[' => {
                     pattern_peek_iterator.next();
                     let mut is_neg = false;
@@ -197,6 +201,7 @@ impl From<&str> for PatternParser {
                             && char.ne(&' ')
                             && char.ne(&'+')
                             && char.ne(&'?')
+                            && char.ne(&'.')
                     }) {
                         literal_char_vec.push(char);
                     }
@@ -555,7 +560,7 @@ impl PatternParser {
 
                         return try_result;
                     },
-                    MatchResultType::Qualifier(QualifierType::Greedy(char)) => {
+                    MatchResultType::Qualifier(QualifierType::Wildcard) => {
                         todo!()
                     },
                 };
@@ -660,7 +665,7 @@ pub enum MatchResultType {
 pub enum QualifierType<T> {
     Positive(Box<T>),
     Lazy(Box<T>),
-    Greedy(Box<T>),
+    Wildcard,
 }
 
 impl CharacterClasses {
@@ -694,6 +699,9 @@ impl CharacterClasses {
             },
             CharacterClasses::LazyQuantifier(c) => {
                 MatchResultType::Qualifier(QualifierType::Lazy(c.clone()))
+            },
+            CharacterClasses::WildcardQualifier => {
+                MatchResultType::Qualifier(QualifierType::Wildcard)
             },
         }
     }
@@ -935,6 +943,23 @@ pub mod pattern_parser_tests {
             CharacterClasses::Literal("d".to_string()),
             CharacterClasses::LazyQuantifier(Box::new(CharacterClasses::Literal("a".to_string()))),
             CharacterClasses::Literal("ys".to_string()),
+        ];
+
+        assert_equality_test(pattern_str, expected_pattern);
+        let pattern_str = "d.g";
+        let expected_pattern = vec![
+            CharacterClasses::Literal("d".to_string()),
+            CharacterClasses::WildcardQualifier,
+            CharacterClasses::Literal("g".to_string()),
+        ];
+
+        assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "\\d.g";
+        let expected_pattern = vec![
+            CharacterClasses::Digits,
+            CharacterClasses::WildcardQualifier,
+            CharacterClasses::Literal("g".to_string()),
         ];
 
         assert_equality_test(pattern_str, expected_pattern);
