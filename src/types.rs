@@ -561,7 +561,17 @@ impl PatternParser {
                         return try_result;
                     },
                     MatchResultType::Qualifier(QualifierType::Wildcard) => {
-                        todo!()
+                        let mut is_newline = false;
+                        let mut to_skip = 1;
+                        if char.eq(&'\\')
+                            && let Some((ix, char_next)) = input_peekable.peek()
+                            && char_next.eq(&'n')
+                        {
+                            is_newline = true;
+                            to_skip = 2;
+                        }
+
+                        (!is_newline, to_skip)
                     },
                 };
 
@@ -1036,5 +1046,6 @@ pub mod pattern_parser_tests {
         assert!(!assert_pattern_matches("ca?t", " caat"));
         assert!(assert_pattern_matches("ca?t", "act"));
         assert!(assert_pattern_matches("ca?a?t", "cat"));
+        assert!(assert_pattern_matches("d.g", "dog"));
     }
 }
