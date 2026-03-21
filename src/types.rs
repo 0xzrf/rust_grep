@@ -16,6 +16,7 @@ pub enum CharacterClasses {
     LineAnchor(Vec<CharacterClasses>),
     ImmAnchor(Vec<CharacterClasses>),
     PositiveQuantifier(Box<CharacterClasses>),
+    LazyQuantifier(Box<CharacterClasses>),
     /// Whitespecee
     WhiteSpace,
 }
@@ -128,6 +129,24 @@ impl From<&str> for PatternParser {
                             .push(CharacterClasses::PositiveQuantifier(Box::new(last_pattern)));
                     }
                 },
+                Some((ix, char)) if char == &'?' => {
+                    let last_pattern = pattern_vec.pop().unwrap();
+
+                    if let CharacterClasses::Literal(literal) = &last_pattern
+                        && literal.len() > 1
+                    {
+                        let literal_vec = literal.chars().collect::<Vec<char>>();
+                        let (remaining, rep_char) = literal_vec.split_at(literal.len() - 1);
+
+                        pattern_vec
+                            .push(CharacterClasses::Literal(remaining.iter().collect::<String>()));
+                        pattern_vec.push(CharacterClasses::LazyQuantifier(Box::new(
+                            CharacterClasses::Literal(rep_char.iter().collect::<String>()),
+                        )));
+                    } else {
+                        pattern_vec.push(CharacterClasses::LazyQuantifier(Box::new(last_pattern)));
+                    }
+                },
                 Some((_, y)) if y == &'[' => {
                     pattern_peek_iterator.next();
                     let mut is_neg = false;
@@ -172,8 +191,12 @@ impl From<&str> for PatternParser {
                 Some(_literal) => {
                     let mut literal_char_vec: Vec<char> = vec![];
 
-                    while let Some((ix, char)) = pattern_peek_iterator.next_if(|(_, char)| {
-                        char.ne(&'\\') && char.ne(&'[') && char.ne(&' ') && char.ne(&'+')
+                    while let Some((_ix, char)) = pattern_peek_iterator.next_if(|(_, char)| {
+                        char.ne(&'\\')
+                            && char.ne(&'[')
+                            && char.ne(&' ')
+                            && char.ne(&'+')
+                            && char.ne(&'?')
                     }) {
                         literal_char_vec.push(char);
                     }
@@ -210,7 +233,7 @@ impl PatternParser {
 
         while input_peekable.peek().is_some() {
             let mut match_pattern_vec = pattern_vec.iter().map(|x| (false, x)).collect::<Vec<_>>();
-            let mut pattern_ix_counter = 0u64;
+            let pattern_ix_counter = 0u64;
             for (matched, pattern) in match_pattern_vec.iter_mut() {
                 let Some((position_counter, char)) = input_peekable.peek() else { break };
 
@@ -471,6 +494,9 @@ impl PatternParser {
                             .is_some()
                         {}
 
+                        if pattern_count == 0 {
+                            return false;
+                        }
 
                         let remaining_matches = self
                             .0
@@ -491,8 +517,56 @@ impl PatternParser {
 
                         return try_result;
                     },
-                    MatchResultType::Qualifier(QualifierType::Lazy(char)) => {
-                        todo!()
+                    MatchResultType::Qualifier(QualifierType::Lazy(target_pattern)) => {
+                        // input_peekable.next_if(|(ix, char)| {
+                        //     let try_input = input.chars().skip(*ix).collect::<String>();
+                        //     println!("try_input within loop: {try_input}");
+                        //     match target_pattern.as_ref().match_char_with_pattern(*char) {
+                        //         MatchResultType::Char(matched) => matched,
+                        //         MatchResultType::Literal(literal) => literal.eq(&char.to_string()),
+                        //         _ => unreachable!(),
+                        //     }
+                        // });
+                        let mut pattern_counter = 0u64;
+
+                        if let Some((ix, char)) = input_peekable.peek() {
+                            println!("char rn: {char}");
+                            match target_pattern.as_ref().match_char_with_pattern(*char) {
+                                MatchResultType::Char(true) => {
+                                    pattern_counter += 1;
+                                    input_peekable.next();
+                                },
+                                MatchResultType::Literal(literal)
+                                    if literal.eq(&char.to_string()) =>
+                                {
+                                    pattern_counter += 1;
+                                    input_peekable.next();
+                                },
+                                _ => {},
+                            }
+                        }
+
+                        let remaining_matches = self
+                            .0
+                            .iter()
+                            .skip((pattern_ix_counter + 1 + pattern_counter) as usize)
+                            .cloned()
+                            .collect::<Vec<_>>();
+
+                        let mut try_result = false;
+                        println!("remaining_matches: {remaining_matches:#?}");
+                        let pattern_parser = PatternParser(remaining_matches);
+
+                        // println!("input_peek before if let Some(): {:#?}", input_peekable.peek());
+                        if let Some((current_ix, _)) = input_peekable.peek() {
+                            let try_input = input.chars().skip(*current_ix).collect::<String>();
+                            println!("try_input: {try_input}");
+                            if pattern_parser.match_immediate_pattern(&try_input) {
+                                try_result = true;
+                            }
+                        }
+
+                        return try_result;
                     },
                     MatchResultType::Qualifier(QualifierType::Greedy(char)) => {
                         todo!()
@@ -512,7 +586,6 @@ impl PatternParser {
 
                     break;
                 }
-                pattern_ix_counter += 1;
             }
             // println!("match pattern vec: {match_pattern_vec:#?}");
             if match_pattern_vec.iter().all(|x| x.0) {
@@ -521,6 +594,38 @@ impl PatternParser {
             }
         }
         result
+    }
+
+    pub fn match_immediate_pattern(self, input: &str) -> bool {
+        let mut input_char_iter = input.char_indices().peekable();
+        for pattern in self.0 {
+            let Some((input_ix, char)) = input_char_iter.peek() else { return false };
+            println!("pattern:{pattern:#?}\n char: {char}");
+            let (matched, to_skip) = match pattern.match_char_with_pattern(*char) {
+                MatchResultType::Char(matched) => (matched, 1),
+                MatchResultType::Literal(literal) => {
+                    let literal_len = literal.len();
+
+                    // get input ref from char_position to char_position + literal_len
+                    // Get a slice of the input string from char_position to char_position + literal_len
+                    let input_slice: String =
+                        input.chars().skip(*input_ix).take(literal_len).collect();
+
+                    (literal.eq(&input_slice), literal_len)
+                },
+                _ => unreachable!(),
+            };
+
+            if !matched {
+                return false;
+            } else {
+                for _ in 0..to_skip {
+                    input_char_iter.next();
+                }
+            }
+        }
+
+        true
     }
 }
 pub enum MatchResultType {
@@ -534,8 +639,8 @@ pub enum MatchResultType {
 
 pub enum QualifierType<T> {
     Positive(Box<T>),
-    Lazy(T),
-    Greedy(T),
+    Lazy(Box<T>),
+    Greedy(Box<T>),
 }
 
 impl CharacterClasses {
@@ -566,6 +671,9 @@ impl CharacterClasses {
             },
             CharacterClasses::PositiveQuantifier(c) => {
                 MatchResultType::Qualifier(QualifierType::Positive(c.clone()))
+            },
+            CharacterClasses::LazyQuantifier(c) => {
+                MatchResultType::Qualifier(QualifierType::Lazy(c.clone()))
             },
         }
     }
@@ -791,6 +899,25 @@ pub mod pattern_parser_tests {
         ];
 
         assert_equality_test(pattern_str, expected_pattern);
+
+        let pattern_str = "\\d? days";
+        let expected_pattern = vec![
+            CharacterClasses::LazyQuantifier(Box::new(CharacterClasses::Digits)),
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Literal("days".to_string()),
+        ];
+
+        assert_equality_test(pattern_str, expected_pattern);
+        let pattern_str = "\\d da?ys";
+        let expected_pattern = vec![
+            CharacterClasses::Digits,
+            CharacterClasses::WhiteSpace,
+            CharacterClasses::Literal("d".to_string()),
+            CharacterClasses::LazyQuantifier(Box::new(CharacterClasses::Literal("a".to_string()))),
+            CharacterClasses::Literal("ys".to_string()),
+        ];
+
+        assert_equality_test(pattern_str, expected_pattern);
     }
 
     #[test]
@@ -859,5 +986,9 @@ pub mod pattern_parser_tests {
             "^abc_\\d+_xyz$",
             "abc_12332178637812673612837618726_xyz_abc_12332178637812673612837618726_xyz"
         ));
+
+        assert!(assert_pattern_matches("\\d? x", " x"));
+        assert!(!assert_pattern_matches("ca?t", " caat"));
+        assert!(assert_pattern_matches("ca?t", "act"));
     }
 }
