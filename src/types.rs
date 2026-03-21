@@ -379,6 +379,7 @@ impl PatternParser {
                                     {}
 
 
+                                    match_len += pattern_count;
                                     let remaining_matches = imm_anchor
                                         .iter()
                                         .skip(imm_anchor_pattern_counter + 1)
@@ -421,6 +422,7 @@ impl PatternParser {
                                 },
                             };
                             match_len += to_skip as u64;
+
                             if !matched_result {
                                 return false;
                             } else {
@@ -428,6 +430,10 @@ impl PatternParser {
                                     input_peekable.next();
                                 }
                             }
+                        }
+
+                        if input.len() != match_len as usize {
+                            return false; // early return if the length of the input isn't equal to that of the expected match length
                         }
 
                         // if the loop ran without anything being false, then return true
@@ -844,6 +850,14 @@ pub mod pattern_parser_tests {
         assert!(assert_pattern_matches("\\d+ days", "1000000 days"));
         assert!(assert_pattern_matches("\\w+ genius", "freakin genius"));
         assert!(assert_pattern_matches("ca+at", "caaaaats"));
-        assert!(assert_pattern_matches("^abc_\\d+_xyz$", "abc_123_xyz"));
+        assert!(assert_pattern_matches(
+            "^abc_\\d+_xyz$",
+            "abc_12332178637812673612837618726_xyz"
+        ));
+
+        assert!(!assert_pattern_matches(
+            "^abc_\\d+_xyz$",
+            "abc_12332178637812673612837618726_xyz_abc_12332178637812673612837618726_xyz"
+        ));
     }
 }
